@@ -29,49 +29,28 @@ lastScan = []
 def onlyCode(rawcode):
     return rawcode.decode("utf-8") 
 
-def searchForCode():
-    while True:
-        success, image = cam.read()
-        decoded_list = decode(image)
-        code_list = []
-        for code in decoded_list:
-            #print(code.data, type(code.data))
-            #print(code.type)
-            code_list.append({ "data": onlyCode(code.data), "type": code.type})
-           
-        #cv2.imwrite('/home/pi/projekt/testimage.jpg', image)
+def searchForCode(image):
+    decoded_list = decode(image)
+    code_list = []
+    for code in decoded_list:
+        code_list.append({ "data": onlyCode(code.data), "type": code.type})
+        
     return code_list
 
-def searchForDate():
-    while True:
-        print("------------------------------------------")
-        ret, image = cam.read()
-        #custom_config = r'--oem 3 --psm 6'
-        text = pytesseract.image_to_data(image)
-        """   n_boxes = len(d['text'])
-        text = ""
-        for i in range(n_boxes):
-            if int(d['conf'][i]) > 60:
-                (text, x, y, w, h) = (d['text'][i], d['left'][i], d['top'][i], d['width'][i], d['height'][i])
-                # don't show empty text """
-        cv2.imwrite('./testimage.jpg', image)
-        return text
+def searchForDate(image):
+    custom_config = r'--oem 3 --psm 6'
+    text = pytesseract.image_to_string(image, config=custom_config, lang="pol")
+    return text
+
+# Open, resize, and convert image to Black and White
 oled.fill(0)
 oled.show()
 
-# Open, resize, and convert image to Black and White
-
 while True:
-    """  codes = searchForCode()
-    for code in codes:
-        print("Git?", code["data"])
-        if input() == 'y':
-            print("gitara")
-            exit() """
-    #print(searchForDate())
-    ret, image = cam.read()
+
+    suc, image = cam.read()
     cv2.imwrite('./testimage.jpg', image)
-    image = (
+    image_screen = (
     Image.open('./testimage.jpg')
     .resize((oled.width, oled.height), Image.BICUBIC)
     .convert("1")
@@ -79,11 +58,12 @@ while True:
     
 
     # Display the converted image
-    oled.image(image)
+    oled.image(image_screen)
     oled.show()
     if GPIO.input(BUTTON_PIN) == GPIO.LOW:
+        print(searchForCode(image))
+        print(searchForDate(image))
         print("ELO")
-        quit()
     #cv2.imshow('Imagetest',image)
     #k = cv2.waitKey(1)
     #if k != -1:
