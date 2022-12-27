@@ -9,6 +9,13 @@ from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
 import numpy as np
 import time
+import sqlite3
+
+con_pr = sqlite3.connect("products.db")
+cur_pr = con_pr.cursor()
+con_ba = sqlite3.connect("base.db")
+cur_ba = con_ba.cursor()
+
 
 MID_PIN = 23
 LFT_PIN = 27
@@ -33,6 +40,20 @@ cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 #cam.set(3, 640)
 #cam.set(4, 480)
 
+def createBase():
+    cur_ba.execute("CREATE TABLE IF NOT EXISTS base (ean NUMERIC NOT NULL,name VARCHAR, date DATE, amount NUMERIC NOT NULL)")
+    con_ba.commit()
+
+def addToDatabase(ean, name, date, amount):
+    cur_ba.execute("INSERT INTO base (ean,name, date, amount) VALUES(?,?,?,?)", (ean,name,date,amount))
+    con_ba.commit()
+
+def searchProductBase(code):
+    cur_pr.execute("SELECT name FROM products WHERE ean=?", (int(code),))
+    rows = cur_pr.fetchall()
+    if len(rows)>0:
+        return rows[0][0]
+    return code
  
 def get_grayscale(image):
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -88,7 +109,7 @@ def outputQuestion(question, text):
             print("R")
             return False
 
-def outputAmount(product):
+def outputAmount(product, date):
     count = 1
     
     while True:
@@ -100,6 +121,7 @@ def outputAmount(product):
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
         draw.text((0, 0), product, font=font, fill=255)
         draw.text((0, 15), "Ilość "+str(count), font=font, fill=255)
+        draw.text((0, 30), "Data "+str(date), font=font, fill=255)
         draw.text((0, 50), "up^  mid ok  vdwn", font=font, fill=255)
 
         # Display image
@@ -140,8 +162,8 @@ productCode = 0
 oled.fill(0)
 oled.show()
 msg = Messages()
+createBase()
 while True:
-
     suc, image = cam.read()
     #gray = get_grayscale(image)
     #thresh = thresholding(gray)
@@ -158,7 +180,7 @@ while True:
     oled.image(image_screen)
     oled.show()
 
-    outputAmount(str("ELOO"))
+    #outputAmount(str("ELOO"),  "12.12.22")
     if GPIO.input(MID_PIN) == GPIO.LOW:
         #searchForDate(image)
         print("ELO")
@@ -166,8 +188,7 @@ while True:
             kody = searchForCode(image)
             if len(kody) > 0:
                 for kod in kody:
-                    if outputQuestion("Zgadza się?", kod["data"]):
-                        print("A")
+                    if outputQuestion("Zgadza się?", searchProductBase(kod["data"])):
                         mode = 1
                         productCode = kod["data"]
                         break 
@@ -177,7 +198,8 @@ while True:
     elif mode == 1:
         mode = 2
     elif mode == 2:
-        outputAmount(productCode)
+        amount = outputAmount(searchProductBase(productCode), "12.12.22")
+        addToDatabase(productCode, searchProductBase(productCode),"12.12.22", amount)
         msg.setMessage("Dodano")
         mode = 0
         
