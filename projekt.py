@@ -11,11 +11,8 @@ import numpy as np
 import time
 import sqlite3
 
-con_pr = sqlite3.connect("products.db")
-cur_pr = con_pr.cursor()
-con_ba = sqlite3.connect("base.db")
-cur_ba = con_ba.cursor()
-
+con = sqlite3.connect("base.db")
+cur = con.cursor()
 
 MID_PIN = 23
 LFT_PIN = 27
@@ -41,16 +38,17 @@ cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 #cam.set(4, 480)
 
 def createBase():
-    cur_ba.execute("CREATE TABLE IF NOT EXISTS base (ean NUMERIC NOT NULL,name VARCHAR, date DATE, amount NUMERIC NOT NULL)")
-    con_ba.commit()
+    cur.execute("CREATE TABLE IF NOT EXISTS storage (ean NUMERIC NOT NULL, date DATE, amount NUMERIC NOT NULL)")
+    cur.execute("CREATE TABLE IF NOT EXISTS products (ean NUMERIC PRIMARY KEY,name VARCHAR NOT NULL)")
+    con.commit()
 
-def addToDatabase(ean, name, date, amount):
-    cur_ba.execute("INSERT INTO base (ean,name, date, amount) VALUES(?,?,?,?)", (ean,name,date,amount))
-    con_ba.commit()
+def addToDatabase(ean, date, amount):
+    cur.execute("INSERT INTO storage (ean, date, amount) VALUES(?,?,?)", (ean,date,amount))
+    con.commit()
 
 def searchProductBase(code):
-    cur_pr.execute("SELECT name FROM products WHERE ean=?", (int(code),))
-    rows = cur_pr.fetchall()
+    cur.execute("SELECT name FROM products WHERE ean=?", (int(code),))
+    rows = cur.fetchall()
     if len(rows)>0:
         return rows[0][0]
     return code
@@ -116,7 +114,7 @@ def outputAmount(product, date):
         time.sleep(0.01)
         image = Image.new("1", (oled.width, oled.height))
         draw = ImageDraw.Draw(image)
-
+    
         # Load a font in 2 different sizes.
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
         draw.text((0, 0), product, font=font, fill=255)
@@ -140,16 +138,19 @@ def outputAmount(product, date):
 
 
 def showExpiring():
-    cur_ba.execute("SELECT name,date FROM base ORDER BY date")
-    rows = cur_ba.fetchall()
+    cur.execute("SELECT p.name,s.date FROM products p, storage s WHERE p.ean = s.ean ORDER BY s.date")
+    rows = cur.fetchall()
     selected = 0
     shift = 0
     while True:
         image = Image.new("1", (oled.width, oled.height))
         draw = ImageDraw.Draw(image)
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
-        
-        row_len = (len(rows)<4 and len(rows)) or 4
+        print(len(rows))
+        row_len = 4
+        if len(rows)<4:
+            row_len=len(rows)
+        print(row_len, "aa",len(rows)<4 and len(rows))
         for i in range(shift,shift+row_len):
            
             if i == selected:
@@ -234,7 +235,7 @@ while True:
             mode = 2
     elif mode == 2:
         amount = outputAmount(searchProductBase(productCode), "12.12.22")
-        addToDatabase(productCode, searchProductBase(productCode),"12.12.21", amount)
+        addToDatabase(productCode,"12.12.21", amount)
         msg.setMessage("Dodano")
         mode = 0
     elif GPIO.input(DWN_PIN) == GPIO.LOW:
