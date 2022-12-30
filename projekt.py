@@ -139,6 +139,42 @@ def outputAmount(product, date):
             return count
 
 
+def showExpiring():
+    cur_ba.execute("SELECT name,date FROM base ORDER BY date")
+    rows = cur_ba.fetchall()
+    selected = 0
+    shift = 0
+    while True:
+        image = Image.new("1", (oled.width, oled.height))
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+        
+        row_len = (len(rows)<4 and len(rows)) or 4
+        for i in range(shift,shift+row_len):
+           
+            if i == selected:
+                print(i)
+                draw.rectangle((0, (i-shift)*15, 128, (i+1-shift)*15), outline=0, fill=1)
+                draw.text((0, (i-shift)*15), str(rows[i][0][:9])+" "+str(rows[i][1]), font=font, fill=0)
+            else:
+                draw.text((0, (i-shift)*15), str(rows[i][0][:9])+" "+str(rows[i][1]), font=font, fill=1)
+        oled.image(image)
+        oled.show()
+        time.sleep(0.01)
+        if GPIO.input(MID_PIN) == GPIO.LOW:
+            return 
+        if GPIO.input(UP_PIN) == GPIO.LOW:
+            selected = selected - 1
+            if selected < 0:
+                selected = 0
+            if selected < shift:
+                shift = shift -1
+        if GPIO.input(DWN_PIN) == GPIO.LOW:
+            selected = selected + 1
+            if selected >= len(rows):
+                selected = len(rows)-1 
+            if selected > shift + 3 and shift+row_len<len(rows):
+                shift = shift + 1
 
 
 
@@ -193,17 +229,17 @@ while True:
                         productCode = kod["data"]
                         break 
             else:
-                msg.setMessage("Nie znaleziono")
-                
-    elif mode == 1:
-        mode = 2
+                msg.setMessage("Nie znaleziono")       
+        elif mode == 1:
+            mode = 2
     elif mode == 2:
         amount = outputAmount(searchProductBase(productCode), "12.12.22")
-        addToDatabase(productCode, searchProductBase(productCode),"12.12.22", amount)
+        addToDatabase(productCode, searchProductBase(productCode),"12.12.21", amount)
         msg.setMessage("Dodano")
         mode = 0
+    elif GPIO.input(DWN_PIN) == GPIO.LOW:
+        showExpiring()
         
-    
     
 
 cam.release()
